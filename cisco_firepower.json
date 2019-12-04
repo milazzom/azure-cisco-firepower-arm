@@ -1,0 +1,400 @@
+{
+    "$schema": "http://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "vmName": {
+            "type": "string",
+            "defaultValue": "ngfw",
+            "metadata": {
+                "description": "Name of the NGFW VM"
+            }
+        },
+        "vmDiskName": {
+            "type": "string",
+            "metadata": {
+                "description": "Name to assign for the disk of this Cisco FirePower NVA."
+            }
+        },
+        "adminUsername": {
+            "type": "string",
+            "defaultValue": "",
+            "metadata": {
+                "description": "Username for the Virtual Machine. admin, Administrator among other values are disallowed - see Azure docs"
+            }
+        },
+        "adminPassword": {
+            "type": "securestring",
+            "defaultValue": "",
+            "metadata": {
+                "description": "Password for the Virtual Machine. Passwords must be 12 to 72 chars and have at least 3 of the following: Lowercase, uppercase, numbers, special chars"
+            }
+        },
+        "vmStorageAccount": {
+            "type": "string",
+            "defaultValue": "",
+            "metadata": {
+                "description": "A storage account name (boot diags require a storage account). Between 3 and 24 characters. Lowercase letters and numbers only"
+            }
+        },
+        "virtualNetworkResourceGroup": {
+            "type": "string",
+            "defaultValue": "",
+            "metadata": {
+                "description": "Name of the existing virtual network's Resource Group"
+            }
+        },
+        "virtualNetworkName": {
+            "type": "string",
+            "metadata": {
+                "description": "Name of the existing virtual network."
+            }
+        },
+        "availabilitySetId": {
+            "type": "string",
+            "metadata": {
+                "description": "Azure resource manager ID for an existing availability set."
+            }
+        },
+        "mgmtNicName": {
+            "type": "string",
+            "metadata": {
+                "description": "Name to assign to the management interface NIC."
+            }
+        },
+        "mgmtSubnetName": {
+            "type": "string",
+            "defaultValue": "",
+            "metadata": {
+                "description": "The FTDv management interface will attach to this subnet"
+            }
+        },
+        "mgmtSubnetIP": {
+            "type": "string",
+            "defaultValue": "",
+            "metadata": {
+                "description": "NGFW IP on the mgmt interface (example: 192.168.0.10)"
+            }
+        },
+        "diagNicName": {
+            "type": "string",
+            "metadata": {
+                "description": "Diag NIC name."
+            }
+        },
+        "diagSubnetName": {
+            "type": "string",
+            "defaultValue": "",
+            "metadata": {
+                "description": "The FTDv diagnostic0/0 interface will attach to this subnet"
+            }
+        },
+        "diagSubnetIP": {
+            "type": "string",
+            "defaultValue": "",
+            "metadata": {
+                "description": "NGFW IP on the diag interface (example: 192.168.1.10)"
+            }
+        },
+        "gig00NicName": {
+            "type": "string",
+            "metadata": {
+                "description": "The name to assign to the external NIC (Gig00)."
+            }
+        },
+        "gig00SubnetName": {
+            "type": "string",
+            "defaultValue": "",
+            "metadata": {
+                "description": "The FTDv Gigabit 0/0 interface will attach to this subnet"
+            }
+        },
+        "gig00SubnetIP": {
+            "type": "string",
+            "defaultValue": "",
+            "metadata": {
+                "description": "The IP on the Gigabit 0/0 interface (example: 192.168.2.10)"
+            }
+        },
+        "gig01NicName": {
+            "type": "string",
+            "metadata": {
+                "description": "NIC name to assign to interface Gig01 (internal)."
+            }
+        },
+        "gig01SubnetName": {
+            "type": "string",
+            "defaultValue": "",
+            "metadata": {
+                "description": "The FTDv Gigabit 0/1 interface will attach to this subnet"
+            }
+        },
+        "gig01SubnetIP": {
+            "type": "string",
+            "defaultValue": "",
+            "metadata": {
+                "description": "The IP on the Gigabit 0/1 interface (example: 192.168.3.5)"
+            }
+        },
+        "VmSize": {
+            "type": "string",
+            "defaultValue": "Standard_D3_v2",
+            "allowedValues": [
+                "Standard_D3_v2",
+                "Standard_D3"
+            ],
+            "metadata": {
+                "description": "NGFW VM Size (Standard_D3_v2 or Standard_D3)"
+            }
+        },
+        "loadBalancerBackEndPool": {
+            "type": "string",
+            "metadata": {
+                "description": "ID and path for the load balancer back-end address pool to add the external NICs to."
+            }
+        }
+    },
+    "variables": {
+
+        "virtualNetworkID": "[resourceId(parameters('virtualNetworkResourceGroup'),'Microsoft.Network/virtualNetworks', parameters('virtualNetworkName'))]",
+        "vmNic0Name": "[parameters('mgmtNicName')]",
+        "vmNic1Name": "[parameters('diagNicName')]",
+        "vmNic2Name": "[parameters('gig00NicName')]",
+        "vmNic3Name": "[parameters('gig01NicName')]",
+        "vmNic0NsgName": "[concat(variables('vmNic0Name'),'-NSG')]",
+        "imagePublisher": "cisco",
+        "imageOffer": "cisco-ftdv",
+        "imageSKU": "ftdv-azure-byol",
+        "softwareVersion": "63088.0.0"
+    },
+    "resources": [
+        {
+            "apiVersion": "2015-06-15",
+            "type": "Microsoft.Network/networkSecurityGroups",
+            "name": "[variables('vmNic0NsgName')]",
+            "location": "[resourceGroup().location]",
+            "properties": {
+                "securityRules": [
+                    {
+                        "name": "SSH-Rule",
+                        "properties": {
+                            "description": "Allow SSH",
+                            "protocol": "Tcp",
+                            "sourcePortRange": "*",
+                            "destinationPortRange": "22",
+                            "sourceAddressPrefix": "Internet",
+                            "destinationAddressPrefix": "*",
+                            "access": "Allow",
+                            "priority": 100,
+                            "direction": "Inbound"
+                        }
+                    },
+                    {
+                        "name": "SFtunnel-Rule",
+                        "properties": {
+                            "description": "Allow tcp 8305",
+                            "protocol": "Tcp",
+                            "sourcePortRange": "*",
+                            "destinationPortRange": "8305",
+                            "sourceAddressPrefix": "Internet",
+                            "destinationAddressPrefix": "*",
+                            "access": "Allow",
+                            "priority": 101,
+                            "direction": "Inbound"
+                        }
+                    }
+                ]
+            }
+        },
+        {
+            "apiVersion": "2017-03-01",
+            "type": "Microsoft.Network/networkInterfaces",
+            "name": "[variables('vmNic0Name')]",
+            "location": "[resourceGroup().location]",
+            "dependsOn": [
+                "[concat('Microsoft.Network/networkSecurityGroups/',variables('vmNic0NsgName'))]"
+            ],
+            "properties": {
+                "ipConfigurations": [
+                    {
+                        "name": "ipconfig1",
+                        "properties": {
+                            "privateIPAllocationMethod": "Static",
+                            "privateIPAddress": "[parameters('mgmtSubnetIP')]",
+                            "subnet": {
+                                "id": "[concat(variables('virtualNetworkID'),'/subnets/', parameters('mgmtSubnetName'))]"
+                            }
+                        }
+                    }
+                ],
+                "networkSecurityGroup": {
+                    "id": "[resourceId('Microsoft.Network/networkSecurityGroups', variables('vmNic0NsgName'))]"
+                },
+                "enableIPForwarding": true
+            }
+        },
+        {
+            "apiVersion": "2017-03-01",
+            "type": "Microsoft.Network/networkInterfaces",
+            "name": "[variables('vmNic1Name')]",
+            "location": "[resourceGroup().location]",
+            "dependsOn": [
+            ],
+            "properties": {
+                "ipConfigurations": [
+                    {
+                        "name": "ipconfig1",
+                        "properties": {
+                            "privateIPAllocationMethod": "Static",
+                            "privateIPAddress": "[parameters('diagSubnetIP')]",
+                            "subnet": {
+                                "id": "[concat(variables('virtualNetworkID'),'/subnets/', parameters('diagSubnetName'))]"
+                            }
+                        }
+                    }
+                ],
+                "enableIPForwarding": true
+            }
+        },
+        {
+            "apiVersion": "2017-03-01",
+            "type": "Microsoft.Network/networkInterfaces",
+            "name": "[variables('vmNic2Name')]",
+            "location": "[resourceGroup().location]",
+            "dependsOn": [
+            ],
+            "properties": {
+                "ipConfigurations": [
+                    {
+                        "name": "ipconfig1",
+                        "properties": {
+                            "privateIPAllocationMethod": "Static",
+                            "privateIPAddress": "[parameters('gig00SubnetIP')]",
+                            "subnet": {
+                                "id": "[concat(variables('virtualNetworkID'),'/subnets/', parameters('gig00SubnetName'))]"
+                            },
+                            "loadBalancerBackendAddressPools": [
+                                {
+                                    "id": "[parameters('loadBalancerBackEndPool')]"
+                                }
+                            ]
+                        }
+                    }
+                ],
+                "enableIPForwarding": true
+            }
+        },
+        {
+            "apiVersion": "2017-03-01",
+            "type": "Microsoft.Network/networkInterfaces",
+            "name": "[variables('vmNic3Name')]",
+            "location": "[resourceGroup().location]",
+            "dependsOn": [
+            ],
+            "properties": {
+                "ipConfigurations": [
+                    {
+                        "name": "ipconfig1",
+                        "properties": {
+                            "privateIPAllocationMethod": "Static",
+                            "privateIPAddress": "[parameters('gig01SubnetIP')]",
+                            "subnet": {
+                                "id": "[concat(variables('virtualNetworkID'),'/subnets/', parameters('gig01SubnetName'))]"
+
+                            }
+                        }
+                    }
+                ],
+                "enableIPForwarding": true
+            }
+        },
+        {
+            "type": "Microsoft.Storage/storageAccounts",
+            "name": "[concat(parameters('vmStorageAccount'))]",
+            "apiVersion": "2015-06-15",
+            "location": "[resourceGroup().location]",
+            "properties": {
+                "accountType": "Standard_LRS"
+            }
+        },
+        {
+            "apiVersion": "2017-12-01",
+            "type": "Microsoft.Compute/virtualMachines",
+            "name": "[parameters('vmName')]",
+            "location": "[resourceGroup().location]",
+            "dependsOn": [
+                "[concat('Microsoft.Storage/storageAccounts/', parameters('vmStorageAccount'))]",
+                "[concat('Microsoft.Network/networkInterfaces/',variables('vmNic0Name'))]",
+                "[concat('Microsoft.Network/networkInterfaces/',variables('vmNic1Name'))]",
+                "[concat('Microsoft.Network/networkInterfaces/',variables('vmNic2Name'))]",
+                "[concat('Microsoft.Network/networkInterfaces/',variables('vmNic3Name'))]"
+            ],
+            "plan": {
+                "name": "ftdv-azure-byol",
+                "publisher": "cisco",
+                "product": "cisco-ftdv"
+            },
+            "properties": {
+                "availabilitySet": {
+                    "id": "[parameters('availabilitySetId')]"
+                },
+                "hardwareProfile": {
+                    "vmSize": "[parameters('vmSize')]"
+                },
+                "osProfile": {
+                    "computername": "[parameters('vmName')]",
+                    "adminUsername": "[parameters('AdminUsername')]",
+                    "adminPassword": "[parameters('AdminPassword')]"
+                },
+                "storageProfile": {
+                    "imageReference": {
+                        "publisher": "[variables('imagePublisher')]",
+                        "offer": "[variables('imageOffer')]",
+                        "sku": "[variables('imageSKU')]",
+                        "version": "[variables('softwareVersion')]"
+                    },
+                    "osDisk": {
+                        "name": "[parameters('vmDiskName')]",
+                        "caching": "ReadWrite",
+                        "createOption": "FromImage"
+                    }
+                },
+                "networkProfile": {
+                    "networkInterfaces": [
+                        {
+                            "properties": {
+                                "primary": true
+                            },
+                            "id": "[resourceId('Microsoft.Network/networkInterfaces', variables('vmNic0Name'))]"
+                        },
+                        {
+                            "properties": {
+                                "primary": false
+                            },
+                            "id": "[resourceId('Microsoft.Network/networkInterfaces', variables('vmNic1Name'))]"
+                        },
+                        {
+                            "properties": {
+                                "primary": false
+                            },
+                            "id": "[resourceId('Microsoft.Network/networkInterfaces', variables('vmNic2Name'))]"
+                        },
+                        {
+                            "properties": {
+                                "primary": false
+                            },
+                            "id": "[resourceId('Microsoft.Network/networkInterfaces', variables('vmNic3Name'))]"
+                        }
+                    ]
+                },
+                "diagnosticsProfile": {
+                    "bootDiagnostics": {
+                        "enabled": true,
+                        "storageUri": "[concat('http://',parameters('vmStorageAccount'),'.blob.core.usgovcloudapi.net')]"
+                    }
+                }
+            }
+        }
+    ],
+    "outputs": {
+    }
+}

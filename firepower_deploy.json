@@ -1,0 +1,432 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "adminUsername":{
+            "type":"string",
+            "defaultValue": "",
+            "metadata": {
+                "description":"Username for the FirePower virtual machines."
+            }
+        },
+        "adminPassword":{
+            "type":"securestring",
+            "defaultValue":"",
+            "metadata":{
+                "description": "Password for the FirePower virtual machines."
+            }
+        },
+        "leftFirepowerName": {
+            "type":"string",
+            "defaultValue": "leftfp"
+        },
+        "leftFirePowerDiskName": {
+            "type":"string",
+            "defaultValue":"",
+            "metadata":{
+                "description": "Name to use for the OS disk for the left FirePower."
+            }
+        },
+        "rightFirePowerDiskName": {
+            "type":"string",
+            "defaultValue":"",
+            "metadata": {
+                "description": "Name to use for the OS disk for the right FirePower."
+            }
+        },
+        "rightFirepowerName": {
+            "type":"string",
+            "defaultValue": "rightfp"
+        },
+        "virtualNetworkResourceGroup": {
+            "type":"string",
+            "defaultValue":"",
+            "metadata":{
+                "description": "Name of the resource group that contains the existing virtual network."
+            }
+        },
+        "availabilitySetName": {
+            "type": "string",
+            "metadata": {
+                "description": "Name for the FirePower Availability Set"
+            }
+        },
+        "templateUrlPrefix": {
+            "type":"string",
+            "metadata": {
+                "description": "URL to use to build FQDN URL for the linked templates."
+            }
+        },
+        "loadBalancerName": {
+            "type":"string",
+            "defaultValue": "fp_ilb"
+        },
+        "loadBalancerIP": {
+            "type":"string",
+            "defaultValue":"",
+            "metadata":{
+                "description": "IP address for the load balancer."
+            }
+        },
+        "virtualNetworkName": {
+            "type":"string",
+            "metadata": {
+                "description": "Name of an existing Virtual Network that will be used to deploy this setup."
+            }
+        },
+        "externalSubnetName": {
+            "type":"string",
+            "metadata": {
+                "description": "Name of the subnet to connect the external interfaces to."
+            }
+        },
+        "mgmtSubnetName": {
+            "type":"string",
+            "metadata": {
+                "description": "Name of the management subnet."
+            }
+        },
+        "diagSubnetName": {
+            "type":"string",
+            "metadata": {
+                "description": "Name of the subnet to use for the diagnostic NIC."
+            }
+        },
+        "internalSubnetName": {
+            "type":"string",
+            "metadata": {
+                "description": "Name of the subnet to connect the internal interfaces to."
+            }
+        },
+        "leftFirepowerStorageAccountName": {
+            "type":"string",
+            "metadata":{
+                "description": "Storage account name to use for the left Firepower."
+            }
+        },
+        "rightFirepowerStorageAccountName": {
+            "type": "string",
+            "metadata": {
+                "description": "Storage account name to use for the right Firepower."
+            }
+        },
+        "leftExternalIPAddress": {
+            "type":"string",
+            "metadata": {
+                "description": "IP address for the "
+            }
+        },
+        "leftInternalIPAddress": {
+            "type":"string",
+            "metadata":{
+                "description": ""
+            }
+        },
+        "leftMgmtIPAddress": {
+            "type":"string"
+        },
+        "leftDiagIPAddress": {
+            "type":"string"
+        },
+        "leftExternalNicName":{
+            "type":"string",
+            "defaultValue": "leftfp-ext-nic"
+        },
+        "leftInternalNicName": {
+            "type":"string",
+            "defaultValue":"leftfp-int-nic"
+        },
+        "leftMgmtNicName": {
+            "type":"string",
+            "defaultValue":"leftfp-mgmt-nic"
+        },
+        "leftDiagNicName":{
+            "type":"string",
+            "defaultValue": "leftfp-diag-nic"
+        },
+        "rightExternalIPAddress": {
+            "type":"string"
+        },
+        "rightInternalIPAddress": {
+            "type":"string"
+        },
+        "rightMgmtIPAddress": {
+            "type":"string"
+        },
+        "rightDiagIPAddress": {
+            "type":"string"
+        },
+        "rightExternalNicName": {
+            "type":"string",
+            "defaultValue": "rightfp-ext-nic"
+        },
+        "rightInternalNicName": {
+            "type":"string",
+            "defaultValue": "rightfp-int-nic"
+        },
+        "rightMgmtNicName": {
+            "type":"string",
+            "defaultValue": "rightfp-mgmt-nic"
+        },
+        "rightDiagNicName": {
+            "type":"string",
+            "defaultValue": "rightfp-diag-nic"
+        }
+    },
+    "variables": {
+        "firepowerUrl": "[concat(parameters('templateUrlPrefix'),'/cisco_firepower.json')]",
+        "virtualNetworkID": "[resourceId(parameters('virtualNetworkResourceGroup'),'Microsoft.Network/virtualNetworks', parameters('virtualNetworkName'))]",
+        "externalSubnetId": "[concat(variables('virtualNetworkID'),'/subnets/', parameters('externalSubnetName'))]"
+
+    },
+    "resources": [
+        {
+            "name": "[parameters('availabilitySetName')]",
+            "type": "Microsoft.Compute/availabilitySets",
+            "apiVersion": "2019-07-01",
+            "location": "[resourceGroup().location]",
+            "tags": {
+                "displayName": "[parameters('availabilitySetName')]"
+            },
+            "sku": {
+                "name": "Aligned"
+            },
+            "properties": {
+                "platformFaultDomainCount": 2,
+                "platformUpdateDomainCount": 3
+            }
+        },
+        {
+            "type": "Microsoft.Resources/deployments",
+            "apiVersion": "2018-05-01",
+            "name": "leftFirepower",
+            "dependsOn": [
+                "[concat('Microsoft.Compute/availabilitySets/', parameters('availabilitySetName'))]",
+                "[concat('Microsoft.Network/loadBalancers/', parameters('loadBalancerName'))]"
+            ],
+            "properties": {
+                "mode": "Incremental",
+                "templateLink": {
+                    "uri": "[variables('firepowerUrl')]",
+                    "contentVersion": "1.0.0.0"
+                },
+                "parameters": {
+                    "vmStorageAccount": {
+                        "value": "[parameters('leftFirepowerStorageAccountName')]"
+                    },
+                    "vmName": {
+                        "value": "[parameters('leftFirepowerName')]"
+                    },
+                    "adminUsername": {
+                        "value": "[parameters('adminUsername')]"
+                    },
+                    "adminPassword": {
+                        "value": "[parameters('adminPassword')]"
+                    },
+                    "virtualNetworkResourceGroup": {
+                        "value": "[parameters('virtualNetworkResourceGroup')]"
+                    },
+                    "virtualNetworkName": {
+                        "value": "[parameters('virtualNetworkName')]"
+                    },
+                    "availabilitySetId": {
+                        "value": "[resourceId('Microsoft.Compute/availabilitySets', parameters('availabilitySetName'))]"
+                    },
+                    "mgmtNicName": {
+                        "value": "[parameters('leftMgmtNicName')]"
+                    },
+                    "mgmtSubnetName": {
+                        "value": "[parameters('mgmtSubnetName')]"
+                    },
+                    "mgmtSubnetIP": {
+                        "value": "[parameters('leftMgmtIPAddress')]"
+                    },
+                    "diagNicName": {
+                        "value": "[parameters('leftDiagNicName')]"
+                    },
+                    "diagSubnetName": {
+                        "value": "[parameters('diagSubnetName')]"
+                    },
+                    "diagSubnetIP": {
+                        "value": "[parameters('leftDiagIPAddress')]"
+                    },
+                    "gig00NicName": {
+                        "value": "[parameters('leftExternalNicName')]"
+                    },
+                    "gig00SubnetName": {
+                        "value": "[parameters('externalSubnetName')]"
+                    },
+                    "gig00SubnetIP": {
+                        "value": "[parameters('leftExternalIPAddress')]"
+                    },
+                    "gig01NicName": {
+                        "value": "[parameters('leftInternalNicName')]"
+                    },
+                    "gig01SubnetIP": {
+                        "value": "[parameters('leftInternalIPAddress')]"
+                    },
+                    "gig01SubnetName": {
+                        "value": "[parameters('internalSubnetName')]"
+                    },
+                    "vmDiskName": {
+                        "value": "[parameters('leftFirePowerDiskName')]"
+                    },
+                    "loadBalancerBackEndPool": {
+                        "value": "[concat(resourceId('Microsoft.Network/loadBalancers', parameters('loadBalancerName')), '/backendAddressPools/firepower')]"
+                    }
+                }
+            }
+        },
+         {
+            "type": "Microsoft.Network/loadBalancers",
+            "apiVersion": "2018-12-01",
+            "name": "[parameters('loadBalancerName')]",
+            "location": "[resourceGroup().location]",
+            "sku": {
+                "name": "Standard"
+            },
+            "properties": {
+                "frontendIPConfigurations": [
+                    {
+                        "name": "LoadBalancerFrontEnd",
+                        "properties": {
+                            "provisioningState": "Succeeded",
+                            "privateIPAddress": "[parameters('loadBalancerIP')]",
+                            "privateIPAllocationMethod": "Static",
+                            "subnet": {
+                                "id": "[variables('externalSubnetId')]"
+                            }
+                        }
+                    }
+                ],
+                "backendAddressPools": [
+                    {
+                        "name": "firepower"
+                    }
+                ],
+                "loadBalancingRules": [
+                    {
+                        "name": "trafficlbrule",
+                        "properties": {
+                            "frontendIPConfiguration": {
+                                "id": "[concat(resourceId('Microsoft.Network/loadBalancers', parameters('loadBalancerName')), '/frontendIPConfigurations/LoadBalancerFrontEnd')]"
+                            },
+                            "frontendPort": 0,
+                            "backendPort": 0,
+                            "enableFloatingIP": false,
+                            "idleTimeoutInMinutes": 4,
+                            "protocol": "All",
+                            "enableTcpReset": false,
+                            "loadDistribution": "SourceIPProtocol",
+                            "disableOutboundSnat": false,
+                            "backendAddressPool": {
+                                "id": "[concat(resourceId('Microsoft.Network/loadBalancers', parameters('loadBalancerName')), '/backendAddressPools/firepower')]"
+                            },
+                            "probe": {
+                                "id": "[concat(resourceId('Microsoft.Network/loadBalancers', parameters('loadBalancerName')), '/probes/fp_ssh_probe')]"
+                            }
+                        }
+                    }
+                ],
+                "probes": [
+                    {
+                        "name": "fp_ssh_probe",
+                        "properties": {
+                            "provisioningState": "Succeeded",
+                            "protocol": "Tcp",
+                            "port": 22,
+                            "intervalInSeconds": 5,
+                            "numberOfProbes": 2
+                        }
+                    }
+                ],
+                "inboundNatRules": [],
+                "outboundRules": [],
+                "inboundNatPools": []
+            }
+        },
+        {
+            "type": "Microsoft.Resources/deployments",
+            "apiVersion": "2018-05-01",
+            "name": "rightFirepower",
+             "dependsOn": [
+                "[concat('Microsoft.Compute/availabilitySets/', parameters('availabilitySetName'))]",
+                "[concat('Microsoft.Network/loadBalancers/', parameters('loadBalancerName'))]"
+            ],
+            "properties": {
+                "mode": "Incremental",
+                "templateLink": {
+                    "uri": "[variables('firepowerUrl')]",
+                    "contentVersion": "1.0.0.0"
+                },
+                "parameters": {
+                    "vmStorageAccount": {
+                        "value": "[parameters('rightFirepowerStorageAccountName')]"
+                    },
+                    "vmName": {
+                        "value": "[parameters('rightFirepowerName')]"
+                    },
+                    "adminUsername": {
+                        "value": "[parameters('adminUsername')]"
+                    },
+                    "adminPassword": {
+                        "value": "[parameters('adminPassword')]"
+                    },
+                    "virtualNetworkResourceGroup": {
+                        "value": "[parameters('virtualNetworkResourceGroup')]"
+                    },
+                    "virtualNetworkName": {
+                        "value": "[parameters('virtualNetworkName')]"
+                    },
+                    "availabilitySetId": {
+                        "value": "[resourceId('Microsoft.Compute/availabilitySets', parameters('availabilitySetName'))]"
+                    },
+                    "mgmtNicName": {
+                        "value": "[parameters('rightMgmtNicName')]"
+                    },
+                    "mgmtSubnetName": {
+                        "value": "[parameters('mgmtSubnetName')]"
+                    },
+                    "mgmtSubnetIP": {
+                        "value": "[parameters('rightMgmtIPAddress')]"
+                    },
+                    "diagNicName": {
+                        "value": "[parameters('rightDiagNicName')]"
+                    },
+                    "diagSubnetName": {
+                        "value": "[parameters('diagSubnetName')]"
+                    },
+                    "diagSubnetIP": {
+                        "value": "[parameters('rightDiagIPAddress')]"
+                    },
+                    "gig00NicName": {
+                        "value": "[parameters('rightExternalNicName')]"
+                    },
+                    "gig00SubnetName": {
+                        "value": "[parameters('externalSubnetName')]"
+                    },
+                    "gig00SubnetIP": {
+                        "value": "[parameters('rightExternalIPAddress')]"
+                    },
+                    "gig01NicName": {
+                        "value": "[parameters('rightInternalNicName')]"
+                    },
+                    "gig01SubnetIP": {
+                        "value": "[parameters('rightInternalIPAddress')]"
+                    },
+                    "gig01SubnetName": {
+                        "value": "[parameters('internalSubnetName')]"
+                    },
+                    "vmDiskName": {
+                        "value": "[parameters('rightFirePowerDiskName')]"
+                    },
+                    "loadBalancerBackEndPool": {
+                        "value": "[concat(resourceId('Microsoft.Network/loadBalancers', parameters('loadBalancerName')), '/backendAddressPools/firepower')]"
+                    }
+                }
+            }
+        }
+    ],
+    "outputs": {
+    }
+}
