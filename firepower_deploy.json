@@ -53,6 +53,7 @@
         },
         "templateUrlPrefix": {
             "type":"string",
+            "defaultValue": "https://raw.githubusercontent.com/milazzom/azure-cisco-firepower-arm/master",
             "metadata": {
                 "description": "URL to use to build FQDN URL for the linked templates."
             }
