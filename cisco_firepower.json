@@ -151,6 +151,9 @@
             "metadata": {
                 "description": "ID and path for the load balancer back-end address pool to add the external NICs to."
             }
+        },
+        "tags": {
+            "type":"object"
         }
     },
     "variables": {
@@ -321,6 +324,7 @@
             "type": "Microsoft.Compute/virtualMachines",
             "name": "[parameters('vmName')]",
             "location": "[resourceGroup().location]",
+            "tags": "[parameters('tags')]",
             "dependsOn": [
                 "[concat('Microsoft.Storage/storageAccounts/', parameters('vmStorageAccount'))]",
                 "[concat('Microsoft.Network/networkInterfaces/',variables('vmNic0Name'))]",
