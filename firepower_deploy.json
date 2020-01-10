@@ -172,6 +172,9 @@
         "rightDiagNicName": {
             "type":"string",
             "defaultValue": "rightfp-diag-nic"
+        },
+        "tags": {
+            "type":"object"
         }
     },
     "variables": {
@@ -274,6 +277,9 @@
                     },
                     "loadBalancerBackEndPool": {
                         "value": "[concat(resourceId('Microsoft.Network/loadBalancers', parameters('loadBalancerName')), '/backendAddressPools/firepower')]"
+                    },
+                    "tags": {
+                        "value": "[parameters('tags')]"
                     }
                 }
             }
@@ -423,6 +429,9 @@
                     },
                     "loadBalancerBackEndPool": {
                         "value": "[concat(resourceId('Microsoft.Network/loadBalancers', parameters('loadBalancerName')), '/backendAddressPools/firepower')]"
+                    },
+                    "tags": {
+                        "value": "[parameters('tags')]"
                     }
                 }
             }
