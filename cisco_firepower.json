@@ -146,6 +146,19 @@
                 "description": "NGFW VM Size (Standard_D3_v2 or Standard_D3)"
             }
         },
+        "softwareVersion": {
+            "type": "string",
+            "defaultValue": "640102.0.0",
+            "allowedValues": [
+                "650115.0.0",
+                "640102.0.0",
+                "63088.0.0",
+                "623111.0.0"
+            ],
+            "metadata": {
+                "description": "Software version to use."
+            }
+        },
         "loadBalancerBackEndPool": {
             "type": "string",
             "metadata": {
@@ -167,7 +180,7 @@
         "imagePublisher": "cisco",
         "imageOffer": "cisco-ftdv",
         "imageSKU": "ftdv-azure-byol",
-        "softwareVersion": "63088.0.0"
+        "softwareVersion": "[parameters('softwareVersion')]"
     },
     "resources": [
         {
