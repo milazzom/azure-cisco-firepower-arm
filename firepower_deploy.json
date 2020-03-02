@@ -173,6 +173,19 @@
             "type":"string",
             "defaultValue": "rightfp-diag-nic"
         },
+        "softwareVersion": {
+            "type": "string",
+            "defaultValue": "640102.0.0",
+            "allowedValues": [
+                "650115.0.0",
+                "640102.0.0",
+                "63088.0.0",
+                "623111.0.0"
+            ],
+            "metadata": {
+                "description": "Software version to use."
+            }
+        },
         "tags": {
             "type":"object"
         }
@@ -280,6 +293,9 @@
                     },
                     "tags": {
                         "value": "[parameters('tags')]"
+                    },
+                    "softwareVersion": {
+                        "value": "[parameters('softwareVersion')]"
                     }
                 }
             }
@@ -432,6 +448,9 @@
                     },
                     "tags": {
                         "value": "[parameters('tags')]"
+                    },
+                    "softwareVersion": {
+                        "value": "[parameters('softwareVersion')]"
                     }
                 }
             }
